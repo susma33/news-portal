@@ -1,0 +1,17 @@
+{
+  "projects": {
+    "default": "newsintel-ai"
+  },
+  "targets": {
+    "newsintel-ai": {
+      "hosting": {
+        "customer": [
+          "newsintel-ai"
+        ],
+        "admin": [
+          "admin-newsintel"
+        ]
+      }
+    }
+  }
+}

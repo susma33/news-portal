@@ -1,0 +1,96 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
+    function profileExists() { return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)); }
+    function isAdmin() { return profileExists() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'active'; }
+    function activeAccount() { return profileExists() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'active'; }
+    function validHttps(value) { return value == '' || (value is string && value.matches('https://.*')); }
+    function validUserCreate(uid) {
+      return request.resource.data.keys().hasOnly(['uid','displayName','email','role','status','createdAt','updatedAt'])
+        && request.resource.data.keys().hasAll(['uid','displayName','email','role','status','createdAt','updatedAt'])
+        && request.resource.data.uid == uid && request.resource.data.email == request.auth.token.email
+        && request.resource.data.role == 'customer' && request.resource.data.status == 'active'
+        && request.resource.data.displayName is string && request.resource.data.displayName.size() <= 100;
+    }
+    function validNews(data) {
+      return data.keys().hasOnly(['title','slug','excerpt','content','imageUrl','categoryId','categoryName','author','authorId','tags','featured','breaking','status','createdAt','updatedAt','publishedAt'])
+        && data.keys().hasAll(['title','slug','excerpt','content','imageUrl','categoryId','categoryName','author','tags','featured','breaking','status','createdAt','updatedAt'])
+        && data.title is string && data.title.size() > 0 && data.title.size() <= 180
+        && data.slug is string && data.slug.size() > 0 && data.slug.size() <= 200
+        && data.excerpt is string && data.excerpt.size() <= 500
+        && data.content is string && data.content.size() <= 100000
+        && validHttps(data.imageUrl) && data.categoryId is string && data.categoryName is string
+        && data.author is string && data.tags is list && data.tags.size() <= 20
+        && data.featured is bool && data.breaking is bool
+        && data.status in ['draft','published','archived'];
+    }
+    match /users/{uid} {
+      allow create: if isOwner(uid) && validUserCreate(uid);
+      allow read: if isOwner(uid) || isAdmin();
+      allow update: if (isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName','status','updatedAt'])
+        && request.resource.data.status in ['active','suspended']
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.uid == resource.data.uid)
+        || (isOwner(uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName','updatedAt'])
+        && request.resource.data.displayName is string && request.resource.data.displayName.size() <= 100);
+      allow delete: if false;
+    }
+    match /news/{newsId} {
+      allow read: if resource.data.status == 'published' || isAdmin();
+      allow create: if isAdmin() && validNews(request.resource.data);
+      allow update: if isAdmin() && validNews(request.resource.data)
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isAdmin();
+    }
+    match /categories/{categoryId} {
+      allow read: if resource.data.active == true || isAdmin();
+      allow create: if isAdmin() && request.resource.data.keys().hasOnly(['name','slug','description','active','createdAt','updatedAt'])
+        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 60
+        && request.resource.data.slug is string && request.resource.data.description is string && request.resource.data.active is bool;
+      allow update: if isAdmin() && request.resource.data.keys().hasOnly(['name','slug','description','active','createdAt','updatedAt'])
+        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 60
+        && request.resource.data.slug is string && request.resource.data.description is string && request.resource.data.active is bool;
+      allow delete: if isAdmin();
+    }
+    match /verificationRequests/{requestId} {
+      allow create: if activeAccount()
+        && request.resource.data.keys().hasOnly(['userId','headline','claim','sourceUrl','additionalInformation','status','result','reviewNotes','evidenceUrls','createdAt','updatedAt'])
+        && request.resource.data.keys().hasAll(['userId','headline','claim','sourceUrl','additionalInformation','status','result','createdAt','updatedAt'])
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.headline is string && request.resource.data.headline.size() > 0 && request.resource.data.headline.size() <= 180
+        && request.resource.data.claim is string && request.resource.data.claim.size() >= 20 && request.resource.data.claim.size() <= 10000
+        && validHttps(request.resource.data.sourceUrl)
+        && request.resource.data.additionalInformation is string && request.resource.data.additionalInformation.size() <= 5000
+        && request.resource.data.status == 'pending' && request.resource.data.result == 'unverified'
+        && request.resource.data.reviewNotes == '' && request.resource.data.evidenceUrls == [];
+      allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','result','reviewNotes','evidenceUrls','reviewedBy','reviewedAt','updatedAt'])
+        && request.resource.data.status in ['pending','reviewing','completed']
+        && request.resource.data.result in ['likely_true','likely_false','misleading','unverified']
+        && request.resource.data.reviewNotes is string && request.resource.data.reviewNotes.size() <= 10000
+        && request.resource.data.evidenceUrls is list && request.resource.data.evidenceUrls.size() <= 20
+        && request.resource.data.reviewedBy == request.auth.uid;
+      allow delete: if false;
+    }
+    match /activityLogs/{logId} {
+      allow read, create: if isAdmin();
+      allow update, delete: if false;
+    }
+    match /settings/{settingId} {
+      allow read: if settingId == 'public';
+      allow create, update: if isAdmin() && settingId == 'public'
+        && request.resource.data.keys().hasOnly(['portalName','description','contactEmail','logoUrl','socialLinks','updatedAt'])
+        && request.resource.data.portalName is string && request.resource.data.description is string
+        && request.resource.data.contactEmail is string && validHttps(request.resource.data.logoUrl)
+        && request.resource.data.socialLinks is string;
+      allow delete: if false;
+    }
+    match /{document=**} { allow read, write: if false; }
+  }
+}

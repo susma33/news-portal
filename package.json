@@ -1,0 +1,30 @@
+{
+  "name": "newsintel-ai",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "workspaces": ["apps/customer", "apps/admin"],
+  "scripts": {
+    "dev:customer": "npm run dev -w @newsintel/customer",
+    "dev:admin": "npm run dev -w @newsintel/admin",
+    "build:customer": "npm run build -w @newsintel/customer",
+    "build:admin": "npm run build -w @newsintel/admin",
+    "deploy:customer": "npm run build:customer && firebase deploy --only hosting:customer",
+    "deploy:admin": "npm run build:admin && firebase deploy --only hosting:admin",
+    "lint": "eslint apps"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.3.4",
+    "firebase": "^13.2.0",
+    "lucide-react": "^1.68.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-router-dom": "^7.18.5",
+    "tailwindcss": "^4.3.4"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.1.2",
+    "vite": "^8.3.5",
+    "eslint": "^10.13.0"
+  }
+}
