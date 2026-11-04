@@ -1,6 +1,7 @@
 {
   "indexes": [
     {"collectionGroup":"news","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"publishedAt","order":"DESCENDING"}]},
+    {"collectionGroup":"news","queryScope":"COLLECTION","fields":[{"fieldPath":"slug","order":"ASCENDING"},{"fieldPath":"status","order":"ASCENDING"}]},
     {"collectionGroup":"verificationRequests","queryScope":"COLLECTION","fields":[{"fieldPath":"userId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"}]},
     {"collectionGroup":"news","queryScope":"COLLECTION","fields":[{"fieldPath":"categoryName","order":"ASCENDING"},{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"publishedAt","order":"DESCENDING"}]}
   ],

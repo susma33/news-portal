@@ -45,7 +45,33 @@ function Home(){const topics=useCategories();const {news,loading,error}=useNews(
 <section className="category-section"><SectionTitle eyebrow="FIND YOUR FOCUS" title="Explore by topic" link="All categories" href="/categories"/><div className="category-pills">{topics.map((c,i)=><Link key={c.id} to={`/category/${c.name}`}><span>{String(i+1).padStart(2,"0")}</span>{c.name}<ChevronRight size={15}/></Link>)}</div></section></main></>}
 function Listing({category}){const {news,loading,error}=useNews(category);return <main className="wrap page-main"><div className="page-heading"><span className="eyebrow">{category?'TOPIC / '+category.toUpperCase():'THE NEWSROOM'}</span><h1>{category||'Latest news'}</h1><p>Clear reporting and considered perspectives, updated as stories develop.</p></div>{error&&<div className="notice error">{error}</div>}{loading?<div className="loading">Loading stories…</div>:news.length?<div className="cards-grid">{news.map(n=><Card key={n.id} item={n}/>)}</div>:<div className="empty-state"><h3>No published stories yet</h3><p>New reporting will appear here as soon as it is published.</p></div>}</main>}
 function Categories(){const items=useCategories();return <main className="wrap page-main"><div className="page-heading"><span className="eyebrow">FOLLOW WHAT MATTERS</span><h1>Explore topics</h1><p>Choose a desk to see its latest reporting.</p></div>{items.length?<div className="category-grid">{items.map((c,i)=><Link key={c.id} to={`/category/${c.name}`}><span className="category-number">{String(i+1).padStart(2,'0')}</span><b>{c.name}</b><ArrowRight/></Link>)}</div>:<div className="empty-state"><p>Active categories will appear here when the newsroom is configured.</p></div>}</main>}
-function Details(){const {slug}=useParams();const [item,setItem]=useState(null),[loading,setLoading]=useState(true);useEffect(()=>{if(!db)return;let dead=false;(async()=>{try{let s=await getDoc(doc(db,'news',slug));if(!s.exists()){const q=await getDocs(query(collection(db,'news'),where('slug','==',slug),where('status','==','published'),limit(1)));s=q.docs[0]}if(!dead&&s?.exists())setItem({id:s.id,...s.data()})}finally{if(!dead)setLoading(false)}})();return()=>{dead=true}},[slug]);if(loading)return <main className="wrap page-main loading">Loading story…</main>;if(!item)return <main className="wrap page-main"><div className="empty-state"><h2>Story unavailable</h2><p>This story may have moved or is not published.</p><Link to="/latest" className="read-link">Back to latest news</Link></div></main>;return <main className="wrap article"><Link to="/latest" className="back-link">← Latest stories</Link><div className="article-head"><div className="story-meta"><span>{item.categoryName}</span><i/><time>{dateLabel(item.publishedAt)}</time></div><h1>{item.title}</h1><p>{item.excerpt}</p><div className="byline">Reporting by <b>{item.author||'NewsIntel newsroom'}</b></div></div><Image className="article-image" src={item.imageUrl} category={item.categoryName}/><article className="article-copy">{(item.content||'').split('\n').filter(Boolean).map((p,i)=><p key={i}>{p}</p>)}{item.tags?.length>0&&<div className="tags">{item.tags.map(t=><span key={t}>#{t}</span>)}</div>}</article></main>}
+function Details(){
+  const {slug}=useParams()
+  const [item,setItem]=useState(null),[loading,setLoading]=useState(true)
+  useEffect(()=>{
+    if(!db)return
+    let dead=false
+    ;(async()=>{
+      try{
+        const matches=await getDocs(query(collection(db,'news'),where('slug','==',slug),where('status','==','published'),limit(1)))
+        let story=matches.docs[0]
+        if(!story){
+          const byId=await getDoc(doc(db,'news',slug))
+          if(byId.exists()&&byId.data().status==='published')story=byId
+        }
+        if(!dead&&story?.exists())setItem({id:story.id,...story.data()})
+      }catch(error){
+        console.error('Unable to load story:',error)
+      }finally{
+        if(!dead)setLoading(false)
+      }
+    })()
+    return()=>{dead=true}
+  },[slug])
+  if(loading)return <main className="wrap page-main loading">Loading story…</main>
+  if(!item)return <main className="wrap page-main"><div className="empty-state"><h2>Story unavailable</h2><p>This story may have moved or is not published.</p><Link to="/latest" className="read-link">Back to latest news</Link></div></main>
+  return <main className="wrap article"><Link to="/latest" className="back-link">← Latest stories</Link><div className="article-head"><div className="story-meta"><span>{item.categoryName}</span><i/><time>{dateLabel(item.publishedAt)}</time></div><h1>{item.title}</h1><p>{item.excerpt}</p><div className="byline">Reporting by <b>{item.author||'NewsIntel newsroom'}</b></div></div><Image className="article-image" src={item.imageUrl} category={item.categoryName}/><article className="article-copy">{(item.content||'').split('\n').filter(Boolean).map((p,i)=><p key={i}>{p}</p>)}{item.tags?.length>0&&<div className="tags">{item.tags.map(t=><span key={t}>#{t}</span>)}</div>}</article></main>
+}
 function SearchPage(){const [params]=useSearchParams(),[term,setTerm]=useState(params.get('q')||''),{news,loading}=useNews();const results=news.filter(n=>`${n.title} ${n.excerpt} ${n.categoryName} ${(n.tags||[]).join(' ')}`.toLowerCase().includes(term.toLowerCase()));return <main className="wrap page-main"><div className="page-heading"><span className="eyebrow">SEARCH THE NEWSROOM</span><h1>Find a story</h1><p>Search headlines, summaries, topics, and tags in published news.</p></div><div className="search-box"><Search/><input value={term} onChange={e=>setTerm(e.target.value)} placeholder="Try a headline, topic, or keyword…" autoFocus/></div>{loading?<div className="loading">Loading search index…</div>:term?<><p className="result-count">{results.length} {results.length===1?'story':'stories'} matching “{term}”</p><div className="cards-grid">{results.map(n=><Card key={n.id} item={n}/>)}</div></>:<div className="empty-state"><p>Enter a search term to explore published stories.</p></div>}<p className="helper-text">Search is limited to loaded published stories. Firestore does not provide unrestricted full-text search.</p></main>}
 function AuthPage({mode='login',setUser}){
   const nav=useNavigate()
